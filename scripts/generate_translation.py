@@ -70,7 +70,7 @@ def load_keys(full_key, json_data):
     return {
         key.lower(): value
         for key, value in data.items()
-        if not any(b in key.lower() for b in blacklist)
+        if all(b not in key.lower() for b in blacklist)
         and re.findall("^[a-z0-9-_]+$", key.lower())
     }
 

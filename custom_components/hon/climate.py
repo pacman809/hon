@@ -110,16 +110,20 @@ async def async_setup_entry(
     entity: HonClimateEntity | HonACClimateEntity
     for device in hass.data[DOMAIN][entry.unique_id].appliances:
         for description in CLIMATES.get(device.appliance_type, []):
-            if isinstance(description, HonACClimateEntityDescription):
-                if description.key not in list(device.commands):
-                    continue
-                entity = HonACClimateEntity(hass, entry, device, description)
-            elif isinstance(description, HonClimateEntityDescription):
-                if description.key not in device.available_settings:
-                    continue
+            if (
+                not isinstance(description, HonACClimateEntityDescription)
+                and isinstance(description, HonClimateEntityDescription)
+                and description.key not in device.available_settings
+                or not isinstance(description, HonACClimateEntityDescription)
+                and not isinstance(description, HonClimateEntityDescription)
+            ):
+                continue
+            elif not isinstance(description, HonACClimateEntityDescription):
                 entity = HonClimateEntity(hass, entry, device, description)
+            elif description.key in list(device.commands):
+                entity = HonACClimateEntity(hass, entry, device, description)
             else:
-                continue  # type: ignore[unreachable]
+                continue
             await entity.coordinator.async_config_entry_first_refresh()
             entities.append(entity)
     async_add_entities(entities)
@@ -141,11 +145,11 @@ class HonACClimateEntity(HonEntity, ClimateEntity):
         self._set_temperature_bound()
 
         self._attr_hvac_modes = [HVACMode.OFF]
-        for mode in device.settings["settings.machMode"].values:
-            self._attr_hvac_modes.append(HON_HVAC_MODE[int(mode)])
-        self._attr_preset_modes = []
-        for mode in device.settings["startProgram.program"].values:
-            self._attr_preset_modes.append(mode)
+        self._attr_hvac_modes.extend(
+            HON_HVAC_MODE[int(mode)]
+            for mode in device.settings["settings.machMode"].values
+        )
+        self._attr_preset_modes = list(device.settings["startProgram.program"].values)
         self._attr_swing_modes = [
             SWING_OFF,
             SWING_VERTICAL,
@@ -230,10 +234,12 @@ class HonACClimateEntity(HonEntity, ClimateEntity):
     @property
     def fan_modes(self) -> list[str]:
         """Return the list of available fan modes."""
-        fan_modes = []
-        for mode in reversed(self._device.settings["settings.windSpeed"].values):
-            fan_modes.append(HON_FAN[int(mode)])
-        return fan_modes
+        return [
+            HON_FAN[int(mode)]
+            for mode in reversed(
+                self._device.settings["settings.windSpeed"].values
+            )
+        ]
 
     @property
     def fan_mode(self) -> str | None:
@@ -241,9 +247,12 @@ class HonACClimateEntity(HonEntity, ClimateEntity):
         return HON_FAN[self._device.get("windSpeed")]
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
-        fan_modes = {}
-        for mode in reversed(self._device.settings["settings.windSpeed"].values):
-            fan_modes[HON_FAN[int(mode)]] = mode
+        fan_modes = {
+            HON_FAN[int(mode)]: mode
+            for mode in reversed(
+                self._device.settings["settings.windSpeed"].values
+            )
+        }
         self._device.settings["settings.windSpeed"].value = str(fan_modes[fan_mode])
         self._attr_fan_mode = fan_mode
         await self._device.commands["settings"].send()
@@ -254,13 +263,9 @@ class HonACClimateEntity(HonEntity, ClimateEntity):
         """Return the swing setting."""
         horizontal = self._device.get("windDirectionHorizontal")
         vertical = self._device.get("windDirectionVertical")
-        if horizontal == 7 and vertical == 8:
-            return SWING_BOTH
         if horizontal == 7:
-            return SWING_HORIZONTAL
-        if vertical == 8:
-            return SWING_VERTICAL
-        return SWING_OFF
+            return SWING_BOTH if vertical == 8 else SWING_HORIZONTAL
+        return SWING_VERTICAL if vertical == 8 else SWING_OFF
 
     async def async_set_swing_mode(self, swing_mode: str) -> None:
         horizontal = self._device.settings["settings.windDirectionHorizontal"]

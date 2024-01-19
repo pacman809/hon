@@ -791,16 +791,22 @@ async def async_setup_entry(
     entity: HonSensorEntity | HonConfigSensorEntity
     for device in hass.data[DOMAIN][entry.unique_id].appliances:
         for description in SENSORS.get(device.appliance_type, []):
-            if isinstance(description, HonSensorEntityDescription):
-                if device.get(description.key) is None:
-                    continue
-                entity = HonSensorEntity(hass, entry, device, description)
-            elif isinstance(description, HonConfigSensorEntityDescription):
-                if description.key not in device.available_settings:
-                    continue
-                entity = HonConfigSensorEntity(hass, entry, device, description)
-            else:
+            if (
+                not isinstance(description, HonSensorEntityDescription)
+                and isinstance(description, HonConfigSensorEntityDescription)
+                and description.key not in device.available_settings
+                or not isinstance(description, HonSensorEntityDescription)
+                and not isinstance(
+                    description, HonConfigSensorEntityDescription
+                )
+            ):
                 continue
+            elif not isinstance(description, HonSensorEntityDescription):
+                entity = HonConfigSensorEntity(hass, entry, device, description)
+            elif device.get(description.key) is None:
+                continue
+            else:
+                entity = HonSensorEntity(hass, entry, device, description)
             await entity.coordinator.async_config_entry_first_refresh()
             entities.append(entity)
 
@@ -834,20 +840,21 @@ class HonConfigSensorEntity(HonEntity, SensorEntity):
     def _handle_coordinator_update(self, update: bool = True) -> None:
         sensor = self._device.settings.get(self.entity_description.key, None)
         value: float | str
-        if self.entity_description.state_class is not None:
-            if sensor and sensor.value:
-                value = (
-                    float(sensor.value)
-                    if "." in str(sensor.value)
-                    else int(sensor.value)
-                )
-            else:
-                value = 0
-        elif sensor is not None:
-            value = sensor.value
-        else:
+        if (
+            self.entity_description.state_class is not None
+            and sensor
+            and sensor.value
+        ):
+            value = (
+                float(sensor.value)
+                if "." in str(sensor.value)
+                else int(sensor.value)
+            )
+        elif self.entity_description.state_class is not None or sensor is None:
             value = 0
-        if self.entity_description.option_list is not None and not value == 0:
+        else:
+            value = sensor.value
+        if self.entity_description.option_list is not None and value != 0:
             self._attr_options = list(self.entity_description.option_list.values())
             value = get_readable(self.entity_description, value)
         self._attr_native_value = value
