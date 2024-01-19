@@ -94,7 +94,7 @@ class HonFanEntity(HonEntity, FanEntity):
         if self.percentage is None:
             return False
         mode = math.ceil(percentage_to_ranged_value(self._speed_range, self.percentage))
-        return bool(mode > self._wind_speed.min)
+        return mode > self._wind_speed.min
 
     async def async_turn_on(
         self,

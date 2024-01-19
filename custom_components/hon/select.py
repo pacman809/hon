@@ -217,9 +217,7 @@ class HonConfigSelectEntity(HonEntity, SelectEntity):
         if not (setting := self._device.settings.get(self.entity_description.key)):
             return None
         value = get_readable(self.entity_description, setting.value)
-        if value not in self._attr_options:
-            return None
-        return str(value)
+        return None if value not in self._attr_options else str(value)
 
     @property
     def options(self) -> list[str]:
@@ -267,9 +265,7 @@ class HonSelectEntity(HonEntity, SelectEntity):
         if not (setting := self._device.settings.get(self.entity_description.key)):
             return None
         value = get_readable(self.entity_description, setting.value)
-        if value not in self._attr_options:
-            return None
-        return str(value)
+        return None if value not in self._attr_options else str(value)
 
     @property
     def options(self) -> list[str]:

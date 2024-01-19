@@ -58,9 +58,15 @@ def get_entites():
                 category = (
                     "control"
                     if entity.key.startswith("settings")
-                    or isinstance(entity, HonSwitchEntityDescription)
-                    or isinstance(entity, HonControlSwitchEntityDescription)
-                    or entity_type in ["button", "climate", "lock", "light", "fan"]
+                    or isinstance(
+                        entity,
+                        (
+                            HonSwitchEntityDescription,
+                            HonControlSwitchEntityDescription,
+                        ),
+                    )
+                    or entity_type
+                    in ["button", "climate", "lock", "light", "fan"]
                     else "sensor"
                 )
                 result.setdefault(appliance, {}).setdefault(
@@ -76,7 +82,7 @@ def generate_text(entites, models):
         example = f"example_{appliance.lower()}.png"
         if (Path(__file__).parent.parent / "assets" / example).exists():
             text += f"### {APPLIANCES[appliance]} Example\n![{APPLIANCES[appliance]}](assets/{example})\n\n"
-        support_number = sum([len(e) for e in models[appliance.lower()].values()])
+        support_number = sum(len(e) for e in models[appliance.lower()].values())
         text += (
             f"### Supported {APPLIANCES[appliance]} models\nSupport has been confirmed for these "
             f"**{support_number} models**, but many more will work. Please add already supported devices "

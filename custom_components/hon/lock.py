@@ -49,7 +49,7 @@ class HonLockEntity(HonEntity, LockEntity):
     @property
     def is_locked(self) -> bool | None:
         """Return a boolean for the state of the lock."""
-        return bool(self._device.get(self.entity_description.key, 0) == 1)
+        return self._device.get(self.entity_description.key, 0) == 1
 
     async def async_lock(self, **kwargs: Any) -> None:
         """Lock method."""

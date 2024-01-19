@@ -308,7 +308,7 @@ class HonBinarySensorEntity(HonEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool:
-        return bool(
+        return (
             self._device.get(self.entity_description.key, "")
             == self.entity_description.on_value
         )

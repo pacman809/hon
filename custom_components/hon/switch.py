@@ -384,25 +384,33 @@ SWITCHES["WD"] = unique_entities(SWITCHES["WD"], SWITCHES["TD"])
 async def async_setup_entry(
     hass: HomeAssistantType, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    entities = []
     entity: HonConfigSwitchEntity | HonControlSwitchEntity | HonSwitchEntity
+    entities = []
     for device in hass.data[DOMAIN][entry.unique_id].appliances:
         for description in SWITCHES.get(device.appliance_type, []):
-            if isinstance(description, HonConfigSwitchEntityDescription):
-                if description.key not in device.available_settings:
-                    continue
+            if (
+                isinstance(description, HonConfigSwitchEntityDescription)
+                and description.key not in device.available_settings
+                or not isinstance(
+                    description, HonConfigSwitchEntityDescription
+                )
+                and not isinstance(
+                    description, HonControlSwitchEntityDescription
+                )
+                and not isinstance(description, HonSwitchEntityDescription)
+            ):
+                continue
+            elif isinstance(description, HonConfigSwitchEntityDescription):
                 entity = HonConfigSwitchEntity(hass, entry, device, description)
             elif isinstance(description, HonControlSwitchEntityDescription):
-                if not (
-                    device.get(description.key) is not None
-                    or description.turn_on_key in list(device.commands)
-                    or description.turn_off_key in list(device.commands)
+                if (
+                    device.get(description.key) is None
+                    and description.turn_on_key not in list(device.commands)
+                    and description.turn_off_key not in list(device.commands)
                 ):
                     continue
                 entity = HonControlSwitchEntity(hass, entry, device, description)
-            elif isinstance(description, HonSwitchEntityDescription):
-                if f"settings.{description.key}" not in device.available_settings:
-                    continue
+            elif f"settings.{description.key}" in device.available_settings:
                 entity = HonSwitchEntity(hass, entry, device, description)
             else:
                 continue
@@ -443,14 +451,12 @@ class HonSwitchEntity(HonEntity, SwitchEntity):
         """Return True if entity is available."""
         if not super().available:
             return False
-        if not self._device.get("remoteCtrValid", 1) == 1:
+        if self._device.get("remoteCtrValid", 1) != 1:
             return False
         if self._device.get("attributes.lastConnEvent.category") == "DISCONNECTED":
             return False
         setting = self._device.settings[f"settings.{self.entity_description.key}"]
-        if isinstance(setting, HonParameterRange) and len(setting.values) < 2:
-            return False
-        return True
+        return not isinstance(setting, HonParameterRange) or len(setting.values) >= 2
 
     @callback
     def _handle_coordinator_update(self, update: bool = True) -> None:
